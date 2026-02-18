@@ -5,4 +5,7 @@ export const API_ENDPOINTS = {
     USER_LOGIN: "/user/login",
     USER_EXISTS: "/user/exists",
     COUNTRIES_MASTER_DATA: "/master/data/countries",
+    PROJECT_COLORS: "/master/data/project/colors",
+    PROJECT_CREATE: "/project/create",
+    PROJECT_ALL: "/project/all",
 };

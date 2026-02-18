@@ -1,10 +1,15 @@
-import { Button, Tooltip, Modal, Input, Form, ColorPicker } from "antd";
-import { useEffect, useState } from "react";
+import { Button, Tooltip } from "antd";
+import { useEffect, useState, useRef, useCallback } from "react";
 import { Outlet, useNavigate, useLocation } from "react-router-dom";
 import { IoIosArrowBack, IoIosArrowForward } from "react-icons/io";
-import { Home, Inbox, Folder, Users, ListChecks, User, LogOut, Plus, X, Hash } from 'lucide-react';
+import { Home, Inbox, Folder, Users, ListChecks, User, LogOut, Plus } from "lucide-react";
+import { useInfiniteQuery } from "@tanstack/react-query";
+import { getAllProjectsApi } from "../../services/projectApi";
+import AddProjectModal from "./AddProjectModal";
+import { useDispatch, useSelector } from "react-redux";
+import { logOut } from "../../redux/authSlice";
 
-// ─── Helpers ────────────────────────────────────────────────────────────────
+// ─── Helpers ─────────────────────────────────────────────────────────────────
 
 function getInitials(name = "") {
   return name
@@ -15,147 +20,6 @@ function getInitials(name = "") {
     .slice(0, 2);
 }
 
-const PROJECT_COLORS = [
-  "#3b82f6", "#06b6d4", "#8b5cf6", "#ec4899",
-  "#f59e0b", "#10b981", "#ef4444", "#f97316",
-];
-
-// ─── Add Project Modal ───────────────────────────────────────────────────────
-
-function AddProjectModal({ open, onClose, onAdd }) {
-  const [form] = Form.useForm();
-  const [selectedColor, setSelectedColor] = useState(PROJECT_COLORS[0]);
-
-  const handleSubmit = () => {
-    form.validateFields().then((values) => {
-      onAdd({ ...values, color: selectedColor, id: Date.now().toString() });
-      form.resetFields();
-      setSelectedColor(PROJECT_COLORS[0]);
-      onClose();
-    });
-  };
-
-  return (
-    <Modal
-      open={open}
-      onCancel={onClose}
-      footer={null}
-      closable={false}
-      centered
-      width={600}
-      styles={{
-        //mask: { backdropFilter: "blur(6px)", background: "rgba(0,0,0,0.6)" },
-        content: {
-          background: "#141824",
-          border: "1px solid #2d3548",
-          borderRadius: "16px",
-          padding: 0,
-          overflow: "hidden",
-        },
-      }}
-    >
-      {/* Modal Header */}
-      <div className="flex items-center justify-between px-6 py-5 border-b border-[#2d3548]">
-        <div className="flex items-center  gap-3">
-          <span className="text-[#f8fafc] font-semibold text-2xl">Create New Project</span>
-        </div>
-        <button
-          onClick={onClose}
-          className="w-7 h-7 rounded-lg bg-[#2d3548] flex items-center justify-center text-[#94a3b8] hover:text-[#f8fafc] hover:bg-[#3d4557] transition-all"
-        >
-          <X size={14} />
-        </button>
-      </div>
-
-      {/* Modal Body */}
-      <div className="px-6 py-5 space-y-5">
-        <div>
-          <label className="text-xs font-semibold text-[#64748b] uppercase tracking-widest mb-2 block">
-            Project Name
-          </label>
-          <Form form={form} layout="vertical">
-            <Form.Item
-              name="name"
-              rules={[{ required: true, message: "Please enter a project name" }]}
-              style={{ marginBottom: 0 }}
-            >
-              <Input
-                placeholder="Enter project name"
-                className="h-11 rounded-xl text-[#f8fafc] placeholder:text-[#475569]"
-                style={{
-                  background: "#0f1420",
-                  border: "1px solid #2d3548",
-                  color: "#f8fafc",
-                }}
-              />
-            </Form.Item>
-          </Form>
-        </div>
-
-        {/* Color Picker */}
-        <div>
-          <label className="text-xs  font-semibold text-[#64748b] uppercase tracking-widest mb-3 block">
-            Project Color
-          </label>
-          <div className="flex gap-2 flex-wrap">
-            {PROJECT_COLORS.map((color) => (
-              <button
-                key={color}
-                onClick={() => setSelectedColor(color)}
-                className="w-12 h-12 rounded-lg transition-all duration-150 flex items-center justify-center"
-                style={{
-                  background: color,
-                  outline: selectedColor === color ? `2px solid ${color}` : "none",
-                  outlineOffset: "2px",
-                  transform: selectedColor === color ? "scale(1.1)" : "scale(1)",
-                  boxShadow: selectedColor === color ? `0 0 12px ${color}60` : "none",
-                }}
-              />
-            ))}
-          </div>
-        </div>
-
-        {/* Preview */}
-        <div className="px-4 py-3 mt-8 bg-[#0f1420] rounded-xl border border-[#2d3548]">
-          <div className="flex items-center justify-center gap-3">
-            <div
-              className="w-7 h-7 rounded-lg flex items-center justify-center text-white text-xs font-bold flex-shrink-0"
-              style={{ background: selectedColor }}
-            >
-              {form.getFieldValue("name")
-                ? getInitials(form.getFieldValue("name"))
-                : "?"}
-            </div>
-            <span className="text-[#f8fafc] text-sm font-medium">
-              {form.getFieldValue("name") || "Project Name"}
-            </span>
-          </div>
-        </div>
-      </div>
-
-      {/* Modal Footer */}
-      <div className="px-6 py-4  flex gap-3 justify-end">
-        <button
-          onClick={onClose}
-          className="px-4 py-2 rounded-lg text-sm font-medium text-[#94a3b8] bg-[#2d3548] hover:bg-[#3d4557] transition-all"
-        >
-          Cancel
-        </button>
-        <button
-          onClick={handleSubmit}
-          className="px-5 py-2 rounded-lg text-sm font-semibold text-white transition-all hover:opacity-90 hover:-translate-y-0.5"
-          style={{
-            background: `linear-gradient(135deg, #3b82f6, #06b6d4)`,
-            boxShadow: "0 4px 15px rgba(59,130,246,0.3)",
-          }}
-        >
-          Create Project
-        </button>
-      </div>
-    </Modal>
-  );
-}
-
 // ─── Main Layout ─────────────────────────────────────────────────────────────
 
 export default function MainLayout() {
@@ -164,13 +28,67 @@ export default function MainLayout() {
   const [containerHeight, setContainerHeight] = useState(window.innerHeight);
   const [modalOpen, setModalOpen] = useState(false);
   const [selectedProject, setSelectedProject] = useState(null);
-
-  const [projects, setProjects] = useState([
-
-  ]);
+  const dispatch = useDispatch();
 
   const navigate = useNavigate();
   const location = useLocation();
+
+  // Get user from localStorage
+  // const user = JSON.parse(localStorage.getItem("user") || "{}");
+  // const viewerId = user?.id || 1;
+
+  const viewerId = useSelector((state) => state.auth.userId);
+  console.log(viewerId);
+
+  // ── Infinite Query for Projects ───────────────────────────────────────────
+  const {
+    data: projectsData,
+    fetchNextPage,
+    hasNextPage,
+    isFetchingNextPage,
+    refetch: refetchProjects,
+  } = useInfiniteQuery({
+    queryKey: ["projects", { viewer_id: viewerId, per_page: 10, search: "", sort: "desc", order_by: "created_at" }],
+    queryFn: getAllProjectsApi,
+    initialPageParam: 1,
+    getNextPageParam: (lastPage) => {
+      // API response: data.data.{ projects, current_page, per_page, total_count }
+      const pageData = lastPage?.data?.data;
+      if (pageData) {
+        const { current_page, per_page, total_count } = pageData;
+        const totalPages = Math.ceil(total_count / per_page);
+        if (current_page < totalPages) return current_page + 1;
+      }
+      return undefined;
+    },
+  });
+
+  console.log(projectsData);
+
+
+  // Flatten all pages into a single projects array
+  // API: response.data.data.projects
+  const projects = projectsData?.pages?.flatMap(
+    (page) => page?.data?.data?.projects || []
+  ) || [];
+
+  // ── Infinite scroll sentinel ──────────────────────────────────────────────
+  const sentinelRef = useRef(null);
+  const observerRef = useRef(null);
+
+  useEffect(() => {
+    if (observerRef.current) observerRef.current.disconnect();
+    observerRef.current = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting && hasNextPage && !isFetchingNextPage) {
+          fetchNextPage();
+        }
+      },
+      { threshold: 0.1 }
+    );
+    if (sentinelRef.current) observerRef.current.observe(sentinelRef.current);
+    return () => observerRef.current?.disconnect();
+  }, [hasNextPage, isFetchingNextPage, fetchNextPage]);
 
   const toggleCollapsed = () => {
     if (window.innerWidth > 768) {
@@ -180,7 +98,7 @@ export default function MainLayout() {
     }
   };
 
-  // ── MAIN menu items ────────────────────────────────────────────────────────
+  // ── MAIN menu items ───────────────────────────────────────────────────────
   const mainMenuItems = [
     { key: "1", label: "Dashboard", icon: <Home size={18} />, route: "/main" },
     { key: "2", icon: <Inbox size={18} />, label: "Inbox", route: "/inbox" },
@@ -203,11 +121,10 @@ export default function MainLayout() {
     navigate(item.route);
   };
 
-  const handleLogout = async () => console.log("logout");
+  // const handleLogout = async () => console.log("logout");
 
-  const handleAddProject = (newProject) => {
-    setProjects((prev) => [...prev, newProject]);
-    setSelectedProject(newProject.id);
+  const handleLogout = async () => {
+    dispatch(logOut());
   };
 
   useEffect(() => {
@@ -219,7 +136,7 @@ export default function MainLayout() {
   return (
     <div className="w-full max-w-screen min-h-screen h-full flex items-center justify-start overflow-hidden">
 
-      {/* ── Sidebar ────────────────────────────────────────────────────────── */}
+      {/* ── Sidebar ──────────────────────────────────────────────────────── */}
       <div
         className={`${collapsed ? "w-[72px]" : "w-[260px]"
           } min-h-dvh max-h-dvh bg-[#141824] border-r border-[#2d3548] relative transition-all duration-300 ease-in-out z-10 flex flex-col`}
@@ -261,7 +178,7 @@ export default function MainLayout() {
           />
         </div>
 
-        {/* ── MAIN Section ─────────────────────────────────────────────────── */}
+        {/* ── MAIN Section ─────────────────────────────────────────────── */}
         <div className="px-3 pt-4">
           {!collapsed && (
             <span className="text-[10px] font-bold uppercase tracking-[0.18em] text-[#475569] px-2 mb-2 block">
@@ -289,9 +206,7 @@ export default function MainLayout() {
           </nav>
         </div>
 
-
-
-        {/* ── PROJECTS Section ─────────────────────────────────────────────── */}
+        {/* ── PROJECTS Section ─────────────────────────────────────────── */}
         <div className="px-3 flex flex-col flex-1 min-h-0 my-4">
           {/* Section Header */}
           <div className={`flex items-center ${collapsed ? "justify-center" : "justify-between"} mb-2 px-1`}>
@@ -313,48 +228,55 @@ export default function MainLayout() {
           {/* Scrollable Projects List */}
           <div
             className="flex flex-col gap-0.5 overflow-y-auto flex-1 pb-3"
-            style={{
-              scrollbarWidth: "none",        /* Firefox */
-              msOverflowStyle: "none",       /* IE/Edge */
-            }}
+            style={{ scrollbarWidth: "none", msOverflowStyle: "none" }}
           >
-            <style>{`
-              .project-scroll::-webkit-scrollbar { display: none; }
-            `}</style>
-            <div className="project-scroll flex flex-col gap-0.5 overflow-y-auto flex-1 pb-3">
-              {projects.map((project) => (
-                <Tooltip key={project.id} title={collapsed ? project.name : ""} placement="right">
-                  <button
-                    onClick={() => setSelectedProject(project.id)}
-                    className={`w-full flex items-center gap-3 ${collapsed ? "justify-center" : ""
-                      } px-3 py-2.5 rounded-[9px] text-[14px] font-medium cursor-pointer transition-all duration-200 border ${selectedProject === project.id
-                        ? "bg-[rgba(255,255,255,0.05)] border-[rgba(255,255,255,0.08)] text-[#f1f5f9]"
-                        : "text-[#94a3b8] hover:bg-[#1e2333] hover:text-[#f1f5f9] border-transparent"
-                      }`}
+            {projects.map((project) => (
+              <Tooltip
+                key={project.id}
+                title={collapsed ? project.project_name : ""}
+                placement="right"
+              >
+                <button
+                  onClick={() => {
+                    setSelectedProject(project.id);
+                    setSelectKey(null); // deselect main menu
+                    navigate(`/project/${project.id}`, { state: { project } });
+                  }}
+                  className={`w-full flex items-center gap-3 ${collapsed ? "justify-center" : ""
+                    } px-3 py-2.5 rounded-[9px] text-[14px] font-medium cursor-pointer transition-all duration-200 border ${selectedProject === project.id
+                      ? "bg-[rgba(255,255,255,0.05)] border-[rgba(255,255,255,0.08)] text-[#f1f5f9]"
+                      : "text-[#94a3b8] hover:bg-[#1e2333] hover:text-[#f1f5f9] border-transparent"
+                    }`}
+                >
+                  <div
+                    className="w-6 h-6 rounded-[7px] flex items-center justify-center text-white text-[10px] font-bold shrink-0"
+                    style={{
+                      background: project.project_color_code || "#3b82f6",
+                      boxShadow: selectedProject === project.id
+                        ? `0 0 10px ${project.project_color_code || "#3b82f6"}55`
+                        : "none",
+                    }}
                   >
-                    {/* Project Avatar */}
-                    <div
-                      className="w-6 h-6 rounded-[7px] flex items-center justify-center text-white text-[10px] font-bold flex-shrink-0"
-                      style={{
-                        background: project.color,
-                        boxShadow: selectedProject === project.id
-                          ? `0 0 10px ${project.color}55`
-                          : "none",
-                      }}
-                    >
-                      {getInitials(project.name)}
-                    </div>
-                    {!collapsed && (
-                      <span className="truncate text-left">{project.name}</span>
-                    )}
-                  </button>
-                </Tooltip>
-              ))}
-            </div>
+                    {getInitials(project.project_name)}
+                  </div>
+                  {!collapsed && (
+                    <span className="truncate text-left">{project.project_name}</span>
+                  )}
+                </button>
+              </Tooltip>
+            ))}
+
+            {/* Infinite scroll sentinel */}
+            <div ref={sentinelRef} className="h-1" />
+            {isFetchingNextPage && (
+              <div className="text-center py-2">
+                <span className="text-[#475569] text-xs">Loading...</span>
+              </div>
+            )}
           </div>
         </div>
 
-        {/* ── Logout ─────────────────────────────────────────────────────────── */}
+        {/* ── Logout ───────────────────────────────────────────────────── */}
         <div className="m-3 mt-0">
           <Tooltip title={collapsed ? "Log Out" : ""} placement="right">
             <button
@@ -369,7 +291,7 @@ export default function MainLayout() {
         </div>
       </div>
 
-      {/* ── Main Content Area ────────────────────────────────────────────── */}
+      {/* ── Main Content Area ─────────────────────────────────────────── */}
       <div className="w-full min-w-0 min-h-dvh max-h-dvh flex-1 flex-col justify-start items-center">
         <div
           className="w-full flex flex-col items-center justify-start px-2 pb-2 overflow-auto"
@@ -381,11 +303,11 @@ export default function MainLayout() {
         </div>
       </div>
 
-      {/* ── Add Project Modal ──────────────────────────────────────────────── */}
+      {/* ── Add Project Modal ─────────────────────────────────────────── */}
       <AddProjectModal
         open={modalOpen}
         onClose={() => setModalOpen(false)}
-        onAdd={handleAddProject}
+        onSuccess={() => refetchProjects()}
       />
     </div>
   );

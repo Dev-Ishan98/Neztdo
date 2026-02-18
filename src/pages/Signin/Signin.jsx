@@ -6,6 +6,9 @@ import { useMutation } from "@tanstack/react-query";
 import { useLocation, useNavigate } from "react-router-dom";
 import { loginUserApi } from "../../services/authApi";
 import useNotification from "../../hooks/useNotification";
+import { useDispatch } from "react-redux";
+import { setToken, setData, setUserId } from "../../redux/authSlice";
+import { setLocalStorageData } from "../../utils/localStorageHelper";
 
 const { Title, Text, Link, Paragraph } = Typography;
 
@@ -14,11 +17,13 @@ const Login = () => {
   const location = useLocation();
   const { notifySuccess, notifyError } = useNotification();
   const [form] = Form.useForm();
+  const dispatch = useDispatch();
 
   const email = location.state?.email || "";
 
   const { mutate, isPending } = useMutation({
     mutationFn: loginUserApi,
+
     onSuccess: (response) => {
       notifySuccess(response?.data?.message);
 
@@ -27,10 +32,18 @@ const Login = () => {
 
       console.log(userData);
 
-      if (userData?.token) {
-        localStorage.setItem("token", userData.token);
-        localStorage.setItem("user", JSON.stringify(userData.user));
-      }
+      dispatch(setToken(userData?.token));
+      dispatch(setData(userData));
+      dispatch(setUserId(userData?.id));
+
+      setLocalStorageData("token", userData?.token);
+      setLocalStorageData("data", userData);
+      setLocalStorageData("userId", userData?.id);
+
+      // if (userData?.token) {
+      //   localStorage.setItem("token", userData.token);
+      //   localStorage.setItem("user", JSON.stringify(userData.user));
+      // }
 
       navigate("/main");
     },

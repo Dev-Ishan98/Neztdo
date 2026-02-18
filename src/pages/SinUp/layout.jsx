@@ -36,7 +36,7 @@ export default function AuthLayout() {
             {/* Right Side - Forms */}
             <div className="w-full lg:w-1/2 flex items-center justify-center p-6 sm:p-8 lg:p-12">
                 <div className="w-full max-w-md">
-                    <div className="bg-slate-800 py-8 px-6 sm:px-10 shadow-2xl rounded-2xl border border-slate-700">
+                    <div className="bg-[#141824] py-8 px-6 sm:px-10 shadow-2xl rounded-2xl border border-slate-700">
                         <Outlet />
 
                         <div className="mt-6 text-center text-xs text-slate-400">

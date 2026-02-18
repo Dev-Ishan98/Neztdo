@@ -7,6 +7,7 @@ import EmailVerify from "../pages/SinUp/Step/EmailVerify";
 import AuthLayout from "../pages/SinUp/layout";
 import Main from "../pages/Dashboard/main";
 import MainLayout from "../pages/mainLayout/mainLayout";
+import ProjectBoardWrapper from "../pages/Project/ProjectBoardWrapper";
 
 export default function RouterSet() {
   return (
@@ -26,8 +27,8 @@ export default function RouterSet() {
 
       <Route path="/" element={<MainLayout />}>
         <Route path="main" element={<Main />} />
+        <Route path="project/:projectId" element={<ProjectBoardWrapper />} />
       </Route>
-
 
     </Routes>
   );

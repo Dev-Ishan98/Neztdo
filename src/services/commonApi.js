@@ -6,3 +6,9 @@ export const getCountriesApi = async () =>
 
 export const getProjectColorsApi = async () =>
     await axiosInstance.get(API_ENDPOINTS.PROJECT_COLORS);
+
+export const getUserRolesApi = async () =>
+    await axiosInstance.get(API_ENDPOINTS.MASTER_DATA_USER_ROLES);
+
+export const getUserPermissionsApi = async () =>
+    await axiosInstance.get(API_ENDPOINTS.MASTER_DATA_USER_PERMISSIONS);

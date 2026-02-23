@@ -101,11 +101,9 @@ export default function MainLayout() {
   // ── MAIN menu items ───────────────────────────────────────────────────────
   const mainMenuItems = [
     { key: "1", label: "Dashboard", icon: <Home size={18} />, route: "/main" },
-    { key: "2", icon: <Inbox size={18} />, label: "Inbox", route: "/inbox" },
-    { key: "3", label: "Projects", icon: <Folder size={18} />, route: "/projects" },
-    { key: "4", icon: <Users size={18} />, label: "Members", route: "/members" },
-    { key: "5", label: "Task Types", icon: <ListChecks size={18} />, route: "/task-types" },
-    { key: "6", label: "Profile", icon: <User size={18} />, route: "/profile" },
+    { key: "5", icon: <ListChecks size={20} />, label: "Tasks", route: "/main/tasks" },
+    { key: "6", icon: <Users size={20} />, label: "Members", route: "/members" },
+    { key: "7", icon: <User size={20} />, label: "Profile", route: "/main/profile" },
   ];
 
   useEffect(() => {

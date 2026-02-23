@@ -13,3 +13,14 @@ export const getAllProjectsApi = async ({ pageParam = 1, queryKey }) => {
         },
     });
 };
+
+export const getProjectTaskTypesApi = async ({ queryKey }) => {
+    const [, params] = queryKey;
+    return await axiosInstance.get(API_ENDPOINTS.PROJECT_TASK_TYPE_ALL, { params });
+};
+
+export const addProjectTaskTypeApi = async (data) =>
+    await axiosInstance.post(API_ENDPOINTS.PROJECT_TASK_TYPE_ADD, data);
+
+export const updateProjectTaskTypeApi = async (data) =>
+    await axiosInstance.post(API_ENDPOINTS.PROJECT_TASK_TYPE_UPDATE, data);

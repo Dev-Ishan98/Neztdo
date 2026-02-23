@@ -2,6 +2,9 @@ import { useState } from "react";
 import { DragDropContext, Droppable, Draggable } from "@hello-pangea/dnd";
 import { Plus, Paperclip, Flame, ChevronRight } from "lucide-react";
 import CreateTaskModal from "../Task/CreateTaskModal";
+import TaskTypeModal from "./TaskTypeModal";
+import AssignMemberModal from "./AssignMemberModal";
+import { Settings, UserPlus } from "lucide-react";
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -274,6 +277,8 @@ function KanbanColumn({ column, tasks, onAddTask }) {
 export default function ProjectBoard({ project }) {
     const [columns, setColumns] = useState(SEED_TASKS);
     const [taskModalOpen, setTaskModalOpen] = useState(false);
+    const [taskTypeModalOpen, setTaskTypeModalOpen] = useState(false);
+    const [assignMemberModalOpen, setAssignMemberModalOpen] = useState(false);
     const [activeTab, setActiveTab] = useState("tasks");
 
     const projectName = project?.project_name || "Project";
@@ -335,18 +340,34 @@ export default function ProjectBoard({ project }) {
                     <span className="text-[#f1f5f9] font-bold text-lg">{projectName}</span>
                 </div>
 
-                {/* Right: New Task button */}
-                <button
-                    onClick={() => setTaskModalOpen(true)}
-                    className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold text-white transition-all hover:opacity-90 hover:-translate-y-0.5"
-                    style={{
-                        background: "linear-gradient(135deg, #3b82f6, #06b6d4)",
-                        boxShadow: "0 4px 15px rgba(59,130,246,0.3)",
-                    }}
-                >
-                    <Plus size={16} />
-                    New Task
-                </button>
+                {/* Right: Buttons */}
+                <div className="flex items-center gap-3">
+                    <button
+                        onClick={() => setAssignMemberModalOpen(true)}
+                        className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold text-[#94a3b8] bg-[#1e293b] border border-[#334155] transition-all hover:text-[#f1f5f9] hover:bg-[#293548] hover:border-[#475569]"
+                    >
+                        <UserPlus size={16} />
+                        Add Member
+                    </button>
+                    <button
+                        onClick={() => setTaskTypeModalOpen(true)}
+                        className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold text-[#94a3b8] bg-[#1e293b] border border-[#334155] transition-all hover:text-[#f1f5f9] hover:bg-[#293548] hover:border-[#475569]"
+                    >
+                        <Settings size={16} />
+                        Task Type
+                    </button>
+                    <button
+                        onClick={() => setTaskModalOpen(true)}
+                        className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold text-white transition-all hover:opacity-90 hover:-translate-y-0.5"
+                        style={{
+                            background: "linear-gradient(135deg, #3b82f6, #06b6d4)",
+                            boxShadow: "0 4px 15px rgba(59,130,246,0.3)",
+                        }}
+                    >
+                        <Plus size={16} />
+                        New Task
+                    </button>
+                </div>
             </div>
 
             {/* ── Tabs ─────────────────────────────────────────────────────────── */}
@@ -358,8 +379,8 @@ export default function ProjectBoard({ project }) {
                             key={tab}
                             onClick={() => setActiveTab(tab.toLowerCase())}
                             className={`px-4 py-2 text-sm font-medium rounded-t-lg transition-all duration-200 border-b-2 ${isActive
-                                    ? "text-[#38bdf8] border-[#38bdf8]"
-                                    : "text-[#64748b] border-transparent hover:text-[#94a3b8]"
+                                ? "text-[#38bdf8] border-[#38bdf8]"
+                                : "text-[#64748b] border-transparent hover:text-[#94a3b8]"
                                 }`}
                         >
                             {tab}
@@ -388,7 +409,21 @@ export default function ProjectBoard({ project }) {
             <CreateTaskModal
                 open={taskModalOpen}
                 onClose={() => setTaskModalOpen(false)}
-                projectName={projectName}
+                project={project}
+            />
+
+            {/* ── Task Type Modal ──────────────────────────────────────────────── */}
+            <TaskTypeModal
+                open={taskTypeModalOpen}
+                onClose={() => setTaskTypeModalOpen(false)}
+                projectId={project?.id}
+            />
+
+            {/* ── Assign Member Modal ─────────────────────────────────────────── */}
+            <AssignMemberModal
+                open={assignMemberModalOpen}
+                onClose={() => setAssignMemberModalOpen(false)}
+                project={project}
             />
         </div>
     );

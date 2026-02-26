@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+﻿import React, { useState } from "react";
 import {
     Modal,
     Input,
@@ -88,6 +88,24 @@ export default function CreateTaskModal({ open, onClose, project }) {
     // { uid, name, previewUrl, fileUrl (from API), uploading, file }
     const [attachments, setAttachments] = useState([]);
     const [selectedMember, setSelectedMember] = useState(null);
+
+    // Watch startDate to conditionally disable past times on today
+    const selectedStartDate = Form.useWatch("startDate", form);
+    const isToday = selectedStartDate && dayjs(selectedStartDate).isSame(dayjs(), "day");
+
+    const getDisabledTime = () => {
+        if (!isToday) return {};
+        const now = dayjs();
+        const currentHour = now.hour();
+        const currentMinute = now.minute();
+        return {
+            disabledHours: () => Array.from({ length: currentHour }, (_, i) => i),
+            disabledMinutes: (selectedHour) =>
+                selectedHour === currentHour
+                    ? Array.from({ length: currentMinute }, (_, i) => i)
+                    : [],
+        };
+    };
 
     console.log("selectedMember", selectedMember);
 
@@ -200,9 +218,12 @@ export default function CreateTaskModal({ open, onClose, project }) {
 
             const startDayjs = buildStartDateTime(startDate, startTime);
 
+            const isMyPlanTask = currentUser?.id === selectedMember?.member_id;
+            const status = isMyPlanTask ? 1 : plan.task_status;
+
             const updatePayload = {
                 task_id: plan.id,
-                task_status: plan.task_status ?? 0,
+                task_status: status,
                 task_type_id: plan.task_type_id,
                 task_type_name: plan.task_type_name,
                 task_title: plan.task_title,
@@ -222,8 +243,8 @@ export default function CreateTaskModal({ open, onClose, project }) {
                 task_assigned_user_role_name: selectedMember?.project_user_role_name ?? null,
                 effort_estimation: effortEstimation ? Number(effortEstimation) : null,
                 effort_estimation_unit: effortUnit?.toLowerCase() ?? "hours",
-                is_my_plan_task: false,
-                is_my_task: true,
+                is_my_plan_task: isMyPlanTask,
+                is_my_task: !isMyPlanTask,
                 has_sub_tasks: plan.has_sub_tasks,
                 sub_tasks_count: plan.sub_tasks_count,
                 sub_tasks: formPayload.sub_tasks || [],
@@ -276,7 +297,8 @@ export default function CreateTaskModal({ open, onClose, project }) {
         fd.append("file", file);
         fd.append("file_size", file.size);
         fd.append("file_name", file.name);
-        fd.uid = uid; // attach uid so mutation recognises it
+        fd.append("index_id", currentUser?.id ?? "");
+        fd.append("created_by", currentUser?.id ?? "");
         uploadFile(Object.assign(fd, { uid }));
 
         return false; // prevent antd auto-upload
@@ -364,8 +386,9 @@ export default function CreateTaskModal({ open, onClose, project }) {
             onCancel={handleClose}
             footer={null}
             closable={false}
+            maskClosable={false}
             centered
-            width={870}
+            width={970}
             styles={{
                 content: {
                     background: "#0f1420",
@@ -378,7 +401,7 @@ export default function CreateTaskModal({ open, onClose, project }) {
             }}
         >
             {/* ── Header ───────────────────────────────────────────────────── */}
-            <div className="flex items-center justify-between px-7 py-5 border-b border-[#1e293b] bg-gradient-to-r from-[#0f1420] to-[#141824]">
+            <div className="flex items-center justify-between px-7 py-5 ">
                 <div className="flex items-center gap-3">
                     <span className="text-[#64748b] text-sm font-medium">
                         {projectName}
@@ -397,30 +420,29 @@ export default function CreateTaskModal({ open, onClose, project }) {
             {/* ── Body ─────────────────────────────────────────────────────── */}
             <div className="px-7 py-6" style={{ maxHeight: "76vh", overflowY: "auto" }}>
                 <Form form={form} layout="vertical">
-                    <div className="grid grid-cols-3 gap-6">
+                    <div className="grid grid-cols-5 gap-10">
 
                         {/* ── Left Column ──────────────────────────────────── */}
-                        <div className="col-span-2 space-y-5">
+                        <div className="col-span-3 space-y-5">
 
                             {/* Task Title */}
                             <Form.Item
                                 name="taskTitle"
                                 rules={[{ required: true, message: "Task title is required" }]}
-                                style={{ marginBottom: 0 }}
+
                             >
                                 <Input
                                     placeholder="Enter title here"
                                     style={{
                                         background: "transparent",
                                         border: "none",
-                                        borderBottom: "1px solid #1e293b",
                                         borderRadius: 0,
                                         color: "#f1f5f9",
                                         padding: "8px 0",
                                         fontSize: "20px",
                                     }}
                                     styles={{ input: { color: "#f1f5f9", fontWeight: 500 } }}
-                                    className="placeholder:text-[#475569]"
+                                    className="placeholder:text-[#475569] custom-transparent-input"
                                 />
                             </Form.Item>
 
@@ -434,11 +456,9 @@ export default function CreateTaskModal({ open, onClose, project }) {
                                         placeholder="Enter description"
                                         rows={3}
                                         style={{
-                                            background: "#141824",
+                                            background: "#37393C",
                                             border: "1px solid #1e293b",
                                             borderRadius: "12px",
-                                            color: "#94a3b8",
-                                            resize: "none",
                                         }}
                                         className="placeholder:text-[#475569]"
                                     />
@@ -453,16 +473,16 @@ export default function CreateTaskModal({ open, onClose, project }) {
                                 <div className="space-y-2">
                                     {subTasks.map((task, i) => (
                                         <div key={i} className="flex items-center gap-2">
-                                            <div className="w-2 h-2 rounded-full bg-[#3b82f6] shrink-0" />
+
                                             <Input
                                                 value={task}
                                                 onChange={(e) => handleSubTaskChange(i, e.target.value)}
                                                 placeholder="Enter sub task"
                                                 style={{
-                                                    background: "#141824",
+                                                    //background: "#141824",
+                                                    background: "#37393C",
                                                     border: "1px solid #1e293b",
                                                     borderRadius: "10px",
-                                                    color: "#94a3b8",
                                                     height: "40px",
                                                     flex: 1,
                                                 }}
@@ -481,7 +501,7 @@ export default function CreateTaskModal({ open, onClose, project }) {
                                 <button
                                     type="button"
                                     onClick={handleAddSubTask}
-                                    className="flex items-center gap-1.5 mt-3 text-[#3b82f6] text-sm font-medium hover:text-[#60a5fa] transition-colors"
+                                    className="flex items-center cursor-pointer gap-1.5 mt-4"
                                 >
                                     <PlusOutlined style={{ fontSize: 13 }} />
                                     Add sub task
@@ -497,13 +517,12 @@ export default function CreateTaskModal({ open, onClose, project }) {
                                     <Input
                                         placeholder="Enter task url"
                                         style={{
-                                            background: "#141824",
+                                            background: "#37393C",
                                             border: "1px solid #1e293b",
                                             borderRadius: "12px",
-                                            color: "#94a3b8",
                                             height: "42px",
                                         }}
-                                        className="placeholder:text-[#475569]"
+                                        className="placeholder:text-[#475569] custom-transparent-input"
                                     />
                                 </Form.Item>
                             </div>
@@ -596,7 +615,7 @@ export default function CreateTaskModal({ open, onClose, project }) {
                         </div>
 
                         {/* ── Right Column ─────────────────────────────────── */}
-                        <div className="space-y-4">
+                        <div className="col-span-2 space-y-4 p-4 bg-[#0f1420]">
 
                             {/* Task Type */}
                             <div>
@@ -611,7 +630,7 @@ export default function CreateTaskModal({ open, onClose, project }) {
                                     <Select
                                         placeholder={typesLoading ? "Loading…" : "Select type"}
                                         loading={typesLoading}
-                                        style={{ width: "100%", height: 42 }}
+                                        style={{ width: "100%", height: 42, background: "#37393C", }}
                                         suffixIcon={<span className="text-[#64748b]">▼</span>}
                                         dropdownStyle={{ background: "#141824", border: "1px solid #1e293b", borderRadius: "12px" }}
                                     >
@@ -653,7 +672,7 @@ export default function CreateTaskModal({ open, onClose, project }) {
                                         format="MM/DD/YYYY"
                                         style={{ width: "100%", height: 42 }}
                                         suffixIcon={<CalendarOutlined className="text-[#64748b]" />}
-                                        className="custom-datepicker"
+                                        disabledDate={(current) => current && current < dayjs().startOf("day")}
                                     />
                                 </Form.Item>
                             </div>
@@ -663,13 +682,15 @@ export default function CreateTaskModal({ open, onClose, project }) {
                                 <label className="text-xs font-medium text-[#94a3b8] mb-2 block">
                                     Set Start Time *
                                 </label>
-                                <Form.Item name="startTime" style={{ marginBottom: 0 }}>
+                                <Form.Item name="startTime" style={{ marginBottom: 0 }} rules={[{ required: true, message: "Start time required" }]}>
                                     <TimePicker
                                         format="hh:mm A"
                                         use12Hours
                                         style={{ width: "100%", height: 42 }}
                                         suffixIcon={<ClockCircleOutlined className="text-[#64748b]" />}
                                         className="custom-timepicker"
+                                        disabledTime={getDisabledTime}
+                                        hideDisabledOptions
                                     />
                                 </Form.Item>
                             </div>
@@ -680,16 +701,34 @@ export default function CreateTaskModal({ open, onClose, project }) {
                             {/* Effort — value + unit row */}
                             <div>
                                 <label className="text-xs font-medium text-[#94a3b8] mb-2 block">
-                                    Effort Estimation
+                                    Effort *
+                                </label>
+
+                                <Form.Item name="effortUnit" initialValue="Hours" style={{ marginBottom: 0 }} rules={[{ required: true, message: "Please select an effort unit" }]}>
+                                    <Select
+                                        style={{ width: "100%", height: 42 }}
+                                        suffixIcon={<span className="text-[#64748b]">▼</span>}
+                                        dropdownStyle={{ background: "#141824", border: "1px solid #1e293b", borderRadius: "12px" }}
+                                    >
+                                        {EFFORT_UNITS.map((u) => (
+                                            <Option key={u} value={u}>{u}</Option>
+                                        ))}
+                                    </Select>
+                                </Form.Item>
+
+                            </div>
+                            <div>
+                                <label className="text-xs font-medium text-[#94a3b8] mb-2 block">
+                                    Estimated Effort *
                                 </label>
                                 <div className="flex gap-2">
-                                    <Form.Item name="effortEstimation" style={{ marginBottom: 0, flex: 1 }}>
+                                    <Form.Item name="effortEstimation" style={{ marginBottom: 0, flex: 1 }} rules={[{ required: true, message: "Please enter estimated effort" }]}>
                                         <Input
                                             type="number"
                                             min={0}
-                                            placeholder="e.g. 5"
+                                            placeholder="Enter estimated effort"
                                             style={{
-                                                background: "#141824",
+                                                background: "#37393C",
                                                 border: "1px solid #1e293b",
                                                 borderRadius: "12px",
                                                 color: "#94a3b8",
@@ -698,17 +737,7 @@ export default function CreateTaskModal({ open, onClose, project }) {
                                             className="placeholder:text-[#475569]"
                                         />
                                     </Form.Item>
-                                    <Form.Item name="effortUnit" initialValue="Hours" style={{ marginBottom: 0, width: 110 }}>
-                                        <Select
-                                            style={{ height: 42 }}
-                                            suffixIcon={<span className="text-[#64748b]">▼</span>}
-                                            dropdownStyle={{ background: "#141824", border: "1px solid #1e293b", borderRadius: "12px" }}
-                                        >
-                                            {EFFORT_UNITS.map((u) => (
-                                                <Option key={u} value={u}>{u}</Option>
-                                            ))}
-                                        </Select>
-                                    </Form.Item>
+
                                 </div>
                             </div>
 
@@ -717,7 +746,7 @@ export default function CreateTaskModal({ open, onClose, project }) {
                                 <label className="text-xs font-semibold text-[#64748b] uppercase tracking-wider mb-2 block">
                                     Assigned To
                                 </label>
-                                <Select
+                                <Form.Item name="assignedTo" style={{ marginBottom: 0, flex: 1 }} > <Select
                                     placeholder={membersLoading ? "Loading…" : "Select a member"}
                                     loading={membersLoading}
                                     style={{ width: "100%", height: 42 }}
@@ -732,6 +761,7 @@ export default function CreateTaskModal({ open, onClose, project }) {
                                     optionFilterProp="children"
                                     allowClear
                                     onClear={() => setSelectedMember(null)}
+
                                 >
                                     {projectMembers.map((member) => (
                                         <Option key={member.member_id} value={member.member_id}>
@@ -749,7 +779,8 @@ export default function CreateTaskModal({ open, onClose, project }) {
                                             </div>
                                         </Option>
                                     ))}
-                                </Select>
+                                </Select></Form.Item>
+
 
                                 {/* Selected member card */}
                                 {selectedMember && (
@@ -789,7 +820,7 @@ export default function CreateTaskModal({ open, onClose, project }) {
             </div>
 
             {/* ── Footer ───────────────────────────────────────────────────── */}
-            <div className="px-7 py-5 border-t border-[#1e293b] flex gap-3 justify-end bg-gradient-to-r from-[#0f1420] to-[#141824]">
+            <div className="px-7 py-5  flex gap-3 justify-end">
                 <Button
                     onClick={handleClose}
                     disabled={isSubmitting}
@@ -803,9 +834,8 @@ export default function CreateTaskModal({ open, onClose, project }) {
                     loading={isSubmitting}
                     className="h-11 px-8 rounded-xl font-semibold text-white"
                     style={{
-                        background: "linear-gradient(135deg, #3b82f6, #06b6d4)",
+                        background: "#357ED8",
                         border: "none",
-                        boxShadow: "0 4px 15px rgba(59,130,246,0.3)",
                     }}
                 >
                     Create Task
@@ -830,7 +860,7 @@ export default function CreateTaskModal({ open, onClose, project }) {
         }
         .ant-select-selection-placeholder { color: #475569 !important; }
         .ant-picker {
-          background: #141824 !important;
+          background: #37393C !important;
           border: 1px solid #1e293b !important;
           border-radius: 12px !important;
           color: #94a3b8 !important;
@@ -881,6 +911,17 @@ export default function CreateTaskModal({ open, onClose, project }) {
         div::-webkit-scrollbar-track { background: #0f1420; }
         div::-webkit-scrollbar-thumb { background: #1e293b; border-radius: 4px; }
         div::-webkit-scrollbar-thumb:hover { background: #334155; }
+        /* Remove autofill background */
+        .custom-transparent-input input:-webkit-autofill,
+        .custom-transparent-input input:-webkit-autofill:hover,
+        .custom-transparent-input input:-webkit-autofill:focus,
+        .custom-transparent-input input:-webkit-autofill:active {
+        -webkit-box-shadow: 0 0 0px 1000px transparent inset !important;
+        box-shadow: 0 0 0px 1000px transparent inset !important;
+       -webkit-text-fill-color: #f1f5f9 !important;
+        transition: background-color 5000s ease-in-out 0s;
+        caret-color: #f1f5f9;
+         }
       `}</style>
         </Modal>
     );

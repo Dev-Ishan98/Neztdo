@@ -19,6 +19,16 @@ function App() {
             colorBgContainer: "#141824",
             activeShadow: "0 0 0 0.2px rgba(5, 145, 255, 0.1)",
           },
+          Select: {
+            colorBgContainer: "#37393C",
+          },
+          Drawer: {
+            colorBgElevated: "#12131f",
+          },
+          // DatePicker: {
+          //   colorBgContainer: "#37393C",
+
+          // },
         }
       }}
     >

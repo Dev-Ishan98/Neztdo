@@ -3,7 +3,7 @@ import { Input, Tooltip, Spin, Empty } from "antd";
 import { SearchOutlined, UserAddOutlined, EditOutlined, CloseOutlined, FolderOutlined, UserOutlined } from "@ant-design/icons";
 import { useInfiniteQuery, useMutation } from "@tanstack/react-query";
 import { useSelector } from "react-redux";
-import { getAllMembersByOwnerApi, cancelInvitationApi, removeMemberApi } from "../../services/memberApi";
+import { getAllMembersByOwnerApi, cancelInvitationApi, removeMemberApi, removeInvitationApi } from "../../services/memberApi";
 import InviteMemberModal from "./InviteMemberModal";
 import MemberSettingsModal from "./MemberSettingsModal";
 import ConfirmModal from "./ConfirmModal";
@@ -95,6 +95,16 @@ export default function Members() {
         onError: (err) => notifyError(err?.response?.data?.message || "Failed to cancel invitation"),
     });
 
+    const { mutate: removeInvitation, isPending: isRemovingInvite } = useMutation({
+        mutationFn: removeInvitationApi,
+        onSuccess: (res) => {
+            notifySuccess(res?.data?.message || "Invitation removed");
+            setConfirmModalOpen(false);
+            refetch();
+        },
+        onError: (err) => notifyError(err?.response?.data?.message || "Failed to remove invitation"),
+    });
+
     const { mutate: removeMember, isPending: isRemoving } = useMutation({
         mutationFn: removeMemberApi,
         onSuccess: (res) => {
@@ -112,6 +122,11 @@ export default function Members() {
         setConfirmModalOpen(true);
     };
 
+    const handleRemoveInviteClick = (member) => {
+        setConfirmAction({ type: "remove_invite", member });
+        setConfirmModalOpen(true);
+    };
+
     const handleDeleteClick = (member) => {
         setConfirmAction({ type: "remove", member });
         setConfirmModalOpen(true);
@@ -121,6 +136,12 @@ export default function Members() {
         const { type, member } = confirmAction;
         if (type === "cancel") {
             cancelInvitation({
+                member_owner_id: currentUser?.id,
+                id: member.id,
+                updated_by: currentUser?.id
+            });
+        } else if (type === "remove_invite") {
+            removeInvitation({
                 member_owner_id: currentUser?.id,
                 id: member.id,
                 updated_by: currentUser?.id
@@ -174,11 +195,11 @@ export default function Members() {
                         <Spin size="large" />
                     </div>
                 ) : members.length > 0 ? (
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
                         {members.map((member) => (
                             <div
                                 key={member.id}
-                                className="group bg-[#141824] border border-[#1e293b] rounded-2xl p-5 hover:border-[#334155] transition-all duration-200"
+                                className="group bg-[#141824] border border-[#1e293b] rounded-[24px] p-6 hover:border-[#334155] transition-all duration-300 hover:shadow-2xl hover:shadow-blue-900/10"
                             >
                                 <div className="flex items-start justify-between mb-4">
                                     <div className="flex items-center gap-3">
@@ -200,43 +221,69 @@ export default function Members() {
                                         </div>
                                     </div>
 
-                                    <button
-                                        onClick={() => {
-                                            setSelectedMember(member);
-                                            setSettingsModalOpen(true);
-                                        }}
-                                        className="w-8 h-8 rounded-lg flex items-center justify-center text-[#475569] hover:text-[#38bdf8] hover:bg-[#1e2333] transition-all"
-                                    >
-                                        <EditOutlined style={{ fontSize: 16 }} />
-                                    </button>
+                                    {member.invite_status !== 0 && member.invite_status !== 2 && (
+                                        <button
+                                            onClick={() => {
+                                                setSelectedMember(member);
+                                                setSettingsModalOpen(true);
+                                            }}
+                                            className="w-8 h-8 rounded-lg flex items-center justify-center text-[#475569] hover:text-[#38bdf8] hover:bg-[#1e2333] transition-all"
+                                        >
+                                            <EditOutlined style={{ fontSize: 16 }} />
+                                        </button>
+                                    )}
                                 </div>
 
                                 <div className="space-y-3">
-                                    <div className="flex items-center justify-between text-[11px]">
-                                        <div className="flex items-center gap-2 text-[#94a3b8]">
-                                            <UserOutlined style={{ fontSize: 12 }} />
-                                            <span>Joined: {dayjs(member.joined_date).format("MMMM D, YYYY")}</span>
+                                    {member.invite_status !== 0 && member.invite_status !== 2 && (
+                                        <div className="flex items-center justify-between text-[11px]">
+                                            <div className="flex items-center gap-2 text-[#94a3b8]">
+                                                <UserOutlined style={{ fontSize: 12 }} />
+                                                <span>Joined: {dayjs(member.joined_date).format("MMMM D, YYYY")}</span>
+                                            </div>
+                                            <div className="flex items-center gap-2 text-[#94a3b8]">
+                                                <FolderOutlined style={{ fontSize: 12 }} />
+                                                <span>Projects: {member.projects_count || 0}</span>
+                                            </div>
                                         </div>
-                                        <div className="flex items-center gap-2 text-[#94a3b8]">
-                                            <FolderOutlined style={{ fontSize: 12 }} />
-                                            <span>Projects: {member.projects_count || 0}</span>
-                                        </div>
-                                    </div>
+                                    )}
 
                                     {/* Status Badge */}
-                                    {member.is_pending ? (
-                                        <div className="flex items-center justify-between bg-[#1e2333] border border-[#2d3548] rounded-xl px-3 py-2">
-                                            <div className="flex items-center gap-2">
-                                                <span className="text-[10px] uppercase font-bold tracking-wider text-[#475569]">Invite Status</span>
-                                                <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-[#f59e0b20] text-[#f59e0b]">
+                                    {member.invite_status === 0 ? (
+                                        <div className="flex items-center justify-between bg-[#1e2333]/50 border border-[#2d3548] rounded-2xl px-4 py-3 mt-2">
+                                            <span className="text-[11px] uppercase font-bold tracking-wider text-[#94a3b8]">Invite Status</span>
+                                            <div className="flex items-center gap-3">
+                                                <span className="text-[11px] font-bold px-4 py-1.5 rounded-xl bg-[#d97706]/20 text-[#fbbf24] shadow-sm">
                                                     Pending
+                                                </span>
+                                                <button
+                                                    onClick={() => handleCancelClick(member)}
+                                                    className="w-6 h-6 rounded-lg flex items-center justify-center text-[#94a3b8] hover:text-[#ef4444] transition-all hover:bg-[#ef4444]/10"
+                                                >
+                                                    <CloseOutlined style={{ fontSize: 12 }} />
+                                                </button>
+                                            </div>
+                                        </div>
+                                    ) : member.invite_status === 1 ? (
+                                        <div className="flex items-center justify-between bg-[#064e3b]/10 border border-[#065f46]/20 rounded-2xl px-4 py-3 mt-2">
+                                            <span className="text-[11px] uppercase font-bold tracking-wider text-[#94a3b8]">Invite Status</span>
+                                            <span className="text-[11px] font-bold px-4 py-1.5 rounded-xl bg-[#10b981]/20 text-[#34d399]">
+                                                Accepted
+                                            </span>
+                                        </div>
+                                    ) : member.invite_status === 2 ? (
+                                        <div className="flex flex-col gap-4 mt-2">
+                                            <div className="flex items-center justify-between bg-[#450a0a]/10 border border-[#7f1d1d]/20 rounded-2xl px-4 py-3">
+                                                <span className="text-[11px] uppercase font-bold tracking-wider text-[#94a3b8]">Invite Status</span>
+                                                <span className="text-[11px] font-bold px-4 py-1.5 rounded-xl bg-[#ef4444]/20 text-[#f87171]">
+                                                    Declined
                                                 </span>
                                             </div>
                                             <button
-                                                onClick={() => handleCancelClick(member)}
-                                                className="w-5 h-5 rounded-md flex items-center justify-center text-[#475569] hover:text-[#ef4444] transition-all"
+                                                onClick={() => handleRemoveInviteClick(member)}
+                                                className="w-full py-3 rounded-xl text-[13px] font-semibold text-[#f1f5f9] bg-[#1e2333] border border-[#2d3548] hover:bg-[#2d3548] transition-all duration-200"
                                             >
-                                                <CloseOutlined style={{ fontSize: 10 }} />
+                                                Remove from member list
                                             </button>
                                         </div>
                                     ) : null}
@@ -277,15 +324,29 @@ export default function Members() {
                 open={confirmModalOpen}
                 onClose={() => setConfirmModalOpen(false)}
                 onConfirm={onConfirmAction}
-                loading={isCancelling || isRemoving}
-                isDanger={confirmAction.type === "remove"}
-                title={confirmAction.type === "cancel" ? "Cancel Invitation" : "Delete Member"}
+                loading={isCancelling || isRemoving || isRemovingInvite}
+                isDanger={confirmAction.type === "remove" || confirmAction.type === "remove_invite"}
+                title={
+                    confirmAction.type === "cancel"
+                        ? "Cancel Invitation"
+                        : confirmAction.type === "remove_invite"
+                            ? "Remove Invitation"
+                            : "Delete Member"
+                }
                 message={
                     confirmAction.type === "cancel"
                         ? `Are you sure you want to cancel the invitation of "${confirmAction.member?.member_nickname || confirmAction.member?.member_email}"?`
-                        : `Are you sure you want to remove the member "${confirmAction.member?.member_nickname || confirmAction.member?.full_name}"?`
+                        : confirmAction.type === "remove_invite"
+                            ? `Are you sure you want to remove the declined invitation of "${confirmAction.member?.member_nickname || confirmAction.member?.member_email}" from the list?`
+                            : `Are you sure you want to remove the member "${confirmAction.member?.member_nickname || confirmAction.member?.full_name}"?`
                 }
-                confirmText={confirmAction.type === "cancel" ? "Yes, cancel" : "Yes, remove"}
+                confirmText={
+                    confirmAction.type === "cancel"
+                        ? "Yes, cancel"
+                        : confirmAction.type === "remove_invite"
+                            ? "Yes, remove"
+                            : "Yes, remove"
+                }
                 cancelText={confirmAction.type === "cancel" ? "Nevermind" : "No"}
             />
 

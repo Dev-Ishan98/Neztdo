@@ -43,7 +43,7 @@ export default function AssignMemberModal({ open, onClose, project }) {
 
     const roles = rolesResponse?.data?.output || [];
     const permissions = permissionsResponse?.data?.output || [];
-    const members = membersResponse?.data?.output?.members || [];
+    const members = (membersResponse?.data?.output?.members || []).filter(m => m.invite_status === 1);
 
     // ─── Mutation ─────────────────────────────────────────────────────────────
     const { mutate: assignMember, isPending: isSubmitting } = useMutation({
@@ -68,7 +68,7 @@ export default function AssignMemberModal({ open, onClose, project }) {
 
             const payload = {
                 project_id: project?.id,
-                member_id: values.member_id,
+                member_id: selectedMember?.member_id,
                 member_owner_id: currentUser?.id,
                 project_user_role_id: values.role_id,
                 project_user_role_name: selectedRole?.role_name,

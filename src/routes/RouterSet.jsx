@@ -9,6 +9,7 @@ import Main from "../pages/Dashboard/main";
 import MainLayout from "../pages/mainLayout/mainLayout";
 import ProjectBoardWrapper from "../pages/Project/ProjectBoardWrapper";
 import Members from "../pages/Members/Members";
+import Inbox from "../pages/Inbox/Inbox";
 
 export default function RouterSet() {
   return (
@@ -29,6 +30,7 @@ export default function RouterSet() {
       <Route path="/" element={<MainLayout />}>
         <Route path="main" element={<Main />} />
         <Route path="members" element={<Members />} />
+        <Route path="inbox" element={<Inbox />} />
         <Route path="project/:projectId" element={<ProjectBoardWrapper />} />
       </Route>
 

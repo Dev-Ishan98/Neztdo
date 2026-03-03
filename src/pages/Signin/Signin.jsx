@@ -1,5 +1,3 @@
-// src/components/auth/Login.jsx
-
 import { Button, Input, Form, Typography, Checkbox } from "antd";
 import { MailOutlined, LockOutlined } from "@ant-design/icons";
 import { useMutation } from "@tanstack/react-query";
@@ -19,18 +17,16 @@ const Login = () => {
   const [form] = Form.useForm();
   const dispatch = useDispatch();
 
-  const email = location.state?.email || "";
+  const email = location.state?.email;
 
   const { mutate, isPending } = useMutation({
     mutationFn: loginUserApi,
 
     onSuccess: (response) => {
       notifySuccess(response?.data?.message);
-
-      // Store user data and token if needed
       const userData = response?.data?.output;
 
-      console.log(userData);
+      //console.log(userData);
 
       dispatch(setToken(userData?.token));
       dispatch(setData(userData));
@@ -39,11 +35,6 @@ const Login = () => {
       setLocalStorageData("token", userData?.token);
       setLocalStorageData("data", userData);
       setLocalStorageData("userId", userData?.id);
-
-      // if (userData?.token) {
-      //   localStorage.setItem("token", userData.token);
-      //   localStorage.setItem("user", JSON.stringify(userData.user));
-      // }
 
       navigate("/main");
     },

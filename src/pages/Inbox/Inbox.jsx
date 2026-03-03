@@ -3,7 +3,18 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useSelector } from "react-redux";
 import { Modal, Input, Spin, Empty, message } from "antd";
 import dayjs from "dayjs";
-import { getInboxApi, acceptMemberInvitationApi, declineMemberInvitationApi, acceptTaskApi, rejectTaskApi, resolveTaskApi } from "../../services/inboxApi";
+import {
+    getInboxApi,
+    acceptMemberInvitationApi,
+    declineMemberInvitationApi,
+    acceptTaskApi,
+    rejectTaskApi,
+    resolveTaskApi,
+    requestTaskEffortChangeApi,
+    approveTaskEffortChangeApi,
+    resubmitTaskEffortChangeApi
+} from "../../services/inboxApi";
+import AcceptTaskModal from "./components/AcceptTaskModal";
 
 // ─── Constants & Helpers ─────────────────────────────────────────────────────
 
@@ -75,7 +86,11 @@ function InviteCard({ n, onResolve, loadingAccept, loadingDecline }) {
             </div>
             <div className="h-px bg-zinc-800 mb-4" />
             <div className="grid grid-cols-[100px_1fr] gap-y-2 mb-4">
-                <MetaRow label="Inviter" value={n.member_owner_name} />
+                {n.sub_type === "request_to_be_member" ? (
+                    <MetaRow label="By" value={n.member_owner_name} />
+                ) : (
+                    <MetaRow label="Inviter" value={n.member_owner_name} />
+                )}
                 {n.project_name && <MetaRow label="Project" value={n.project_name} />}
             </div>
             <div className="flex gap-3">
@@ -109,7 +124,9 @@ function TaskCard({ n, onResolve, loadingAccept, loadingReject }) {
             <div className="flex items-start justify-between mb-2">
                 <div className="flex flex-col gap-2">
                     <StatusBadge type={n.sub_type} />
-                    <h3 className="font-bold text-base text-white">{n.title}</h3>
+                    <h3 className="font-bold text-base text-white">
+                        {n.sub_type === "effort_change_resubmit" ? "Effort Change Resubmit" : n.title}
+                    </h3>
                 </div>
                 <div className="flex items-center gap-2 ml-4">
                     <span className="text-xs text-zinc-500 whitespace-nowrap">
@@ -167,6 +184,9 @@ function EffortCard({ n, onResolve, loading }) {
         { label: "Assignee", value: n.assignee_name || n.member_owner_name },
     ];
 
+    const original = n.original_estimation || {};
+    const requested = n.requested_estimation || {};
+
     return (
         <div className="bg-[#141824] border border-zinc-800 rounded-2xl p-6 hover:border-zinc-600 hover:-translate-y-0.5 transition-all duration-200">
             <div className="flex items-start justify-between mb-4">
@@ -191,21 +211,32 @@ function EffortCard({ n, onResolve, loading }) {
                     <p className="text-xs font-bold uppercase tracking-widest text-red-400 mb-3">Original</p>
                     <p className="text-xs text-zinc-500 mb-0.5">Start Date</p>
                     <p className="text-sm font-semibold text-red-300 mb-2">
-                        {n.original_start_date ? dayjs(n.original_start_date).format("DD MMM YYYY, hh:mm A") : "—"}
+                        {original.task_start_date ? dayjs(original.task_start_date).format("DD MMM YYYY, hh:mm A") : "—"}
                     </p>
                     <p className="text-xs text-zinc-500 mb-0.5">Estimate</p>
-                    <p className="text-sm font-semibold text-red-300">{n.original_effort || "—"}</p>
+                    <p className="text-sm font-semibold text-red-300">
+                        {original.effort_estimation} {original.effort_estimation_unit}
+                    </p>
                 </div>
                 <div>
                     <p className="text-xs font-bold uppercase tracking-widest text-blue-400 mb-3">Requested</p>
                     <p className="text-xs text-zinc-500 mb-0.5">Start Date</p>
                     <p className="text-sm font-semibold text-blue-300 mb-2">
-                        {n.requested_start_date ? dayjs(n.requested_start_date).format("DD MMM YYYY, hh:mm A") : "—"}
+                        {requested.requested_task_start_date ? dayjs(requested.requested_task_start_date).format("DD MMM YYYY, hh:mm A") : (original.task_start_date ? dayjs(original.task_start_date).format("DD MMM YYYY, hh:mm A") : "—")}
                     </p>
                     <p className="text-xs text-zinc-500 mb-0.5">Estimate</p>
-                    <p className="text-sm font-semibold text-blue-300">{n.requested_effort || "—"}</p>
+                    <p className="text-sm font-semibold text-blue-300">
+                        {requested.effort_estimation} {requested.effort_estimation_unit}
+                    </p>
                 </div>
             </div>
+
+            {requested.reason && (
+                <div className="mb-4">
+                    <p className="text-xs text-zinc-500 mb-1">Reason</p>
+                    <p className="text-sm text-zinc-300 italic">"{requested.reason}"</p>
+                </div>
+            )}
 
             <div className="flex gap-3">
                 <ActionButton
@@ -224,7 +255,7 @@ function EffortCard({ n, onResolve, loading }) {
     );
 }
 
-function NotificationCard({ n, onInviteResolve, onTaskResolve, acceptingInvite, decliningInvite, acceptingTask, rejectingTask, resolvingTask }) {
+function NotificationCard({ n, onInviteResolve, onTaskResolve, acceptingInvite, decliningInvite, acceptingTask, rejectingTask, resolvingTask, approvingEffortChange, resubmittingEffortChange }) {
     if (n.sub_type === "member_invitation" || n.sub_type === "request_to_be_member") {
         return (
             <InviteCard
@@ -235,14 +266,27 @@ function NotificationCard({ n, onInviteResolve, onTaskResolve, acceptingInvite, 
             />
         );
     }
-    if (n.sub_type === "assign_task") {
-        return <TaskCard n={n} onResolve={onTaskResolve} loadingAccept={acceptingTask} loadingReject={rejectingTask} />;
+    if (n.sub_type === "assign_task" || n.sub_type === "effort_change_resubmit") {
+        return (
+            <TaskCard
+                n={n}
+                onResolve={onTaskResolve}
+                loadingAccept={acceptingTask}
+                loadingReject={rejectingTask}
+            />
+        );
     }
     if (n.sub_type === "pending_task" || n.sub_type === "task_to_be_reviewed") {
         return <SimpleCard n={n} />;
     }
-    if (n.sub_type === "effort_change_request" || n.sub_type === "effort_change_resubmit") {
-        return <EffortCard n={n} onResolve={onTaskResolve} loading={resolvingTask} />;
+    if (n.sub_type === "effort_change_request") {
+        return (
+            <EffortCard
+                n={n}
+                onResolve={onTaskResolve}
+                loading={approvingEffortChange || resubmittingEffortChange}
+            />
+        );
     }
     return (
         <div className="bg-[#141824] border border-zinc-800 rounded-2xl p-6">
@@ -265,6 +309,9 @@ export default function Inbox() {
     const [rejectModalOpen, setRejectModalOpen] = useState(false);
     const [rejectingItem, setRejectingItem] = useState(null);
     const [rejectReason, setRejectReason] = useState("");
+    const [acceptModalOpen, setAcceptModalOpen] = useState(false);
+    const [acceptingItem, setAcceptingItem] = useState(null);
+    const [processingId, setProcessingId] = useState(null);
 
     const { data: inboxRes, isLoading } = useQuery({
         queryKey: ["inbox", {
@@ -286,6 +333,7 @@ export default function Inbox() {
             queryClient.invalidateQueries({ queryKey: ["inbox"] });
         },
         onError: (err) => message.error(err?.response?.data?.message || "Failed to accept invitation"),
+        onSettled: () => setProcessingId(null),
     });
 
     const { mutate: declineInvite, isPending: decliningInvite } = useMutation({
@@ -295,6 +343,7 @@ export default function Inbox() {
             queryClient.invalidateQueries({ queryKey: ["inbox"] });
         },
         onError: (err) => message.error(err?.response?.data?.message || "Failed to decline invitation"),
+        onSettled: () => setProcessingId(null),
     });
 
     const { mutate: acceptTask, isPending: acceptingTask } = useMutation({
@@ -304,6 +353,7 @@ export default function Inbox() {
             queryClient.invalidateQueries({ queryKey: ["inbox"] });
         },
         onError: (err) => message.error(err?.response?.data?.message || "Failed to accept task"),
+        onSettled: () => setProcessingId(null),
     });
 
     const { mutate: rejectTask, isPending: rejectingTask } = useMutation({
@@ -316,6 +366,7 @@ export default function Inbox() {
             queryClient.invalidateQueries({ queryKey: ["inbox"] });
         },
         onError: (err) => message.error(err?.response?.data?.message || "Failed to reject task"),
+        onSettled: () => setProcessingId(null),
     });
 
     const { mutate: resolveGenericTask, isPending: resolvingTask } = useMutation({
@@ -325,9 +376,50 @@ export default function Inbox() {
             queryClient.invalidateQueries({ queryKey: ["inbox"] });
         },
         onError: (err) => message.error(err?.response?.data?.message || "Action failed"),
+        onSettled: () => setProcessingId(null),
     });
 
+    const { mutate: requestEffortChange, isPending: requestingEffortChange } = useMutation({
+        mutationFn: requestTaskEffortChangeApi,
+        onSuccess: (res) => {
+            message.success(res?.data?.message || "Effort change request submitted");
+            queryClient.invalidateQueries({ queryKey: ["inbox"] });
+            setAcceptModalOpen(false);
+            setAcceptingItem(null);
+        },
+        onError: (err) => message.error(err?.response?.data?.message || "Failed to request effort change"),
+        onSettled: () => setProcessingId(null),
+    });
+
+    const { mutate: approveEffortChange, isPending: approvingEffortChange } = useMutation({
+        mutationFn: approveTaskEffortChangeApi,
+        onSuccess: (res) => {
+            message.success(res?.data?.message || "Effort change approved");
+            queryClient.invalidateQueries({ queryKey: ["inbox"] });
+        },
+        onError: (err) => message.error(err?.response?.data?.message || "Failed to approve effort change"),
+        onSettled: () => setProcessingId(null),
+    });
+
+    const { mutate: resubmitEffortChange, isPending: resubmittingEffortChange } = useMutation({
+        mutationFn: resubmitTaskEffortChangeApi,
+        onSuccess: (res) => {
+            message.success(res?.data?.message || "Resubmit request sent");
+            queryClient.invalidateQueries({ queryKey: ["inbox"] });
+        },
+        onError: (err) => message.error(err?.response?.data?.message || "Failed to send resubmit request"),
+        onSettled: () => setProcessingId(null),
+    });
+
+    const resolveTaskAcceptance = async (item) => {
+        acceptTask({
+            task_id: item.task_id,
+            updated_by: userId
+        });
+    };
+
     const handleInviteResolve = (item, status) => {
+        setProcessingId(item.id);
         if (status === "accepted") {
             acceptInvite({
                 member_id: item.member_id,
@@ -346,15 +438,33 @@ export default function Inbox() {
     };
 
     const handleTaskResolve = (item, status) => {
+        setProcessingId(item.id);
         if (status === "accepted") {
-            acceptTask({
-                task_id: item.task_id,
-                updated_by: userId
-            });
+            if (item.sub_type === "assign_task" || item.sub_type === "effort_change_resubmit") {
+                setAcceptingItem(item);
+                setAcceptModalOpen(true);
+            } else if (item.sub_type === "effort_change_request") {
+                approveEffortChange({
+                    task_id: item.task_id,
+                    inbox_id: item.id,
+                    updated_by: userId
+                });
+            } else {
+                acceptTask({
+                    task_id: item.task_id,
+                    updated_by: userId
+                });
+            }
         } else if (status === "declined") {
             setRejectingItem(item);
             setRejectReason("");
             setRejectModalOpen(true);
+        } else if (status === "resubmit") {
+            resubmitEffortChange({
+                task_id: item.task_id,
+                inbox_id: item.id,
+                updated_by: userId
+            });
         } else {
             // For other task types that might still use the generic resolve
             resolveGenericTask({
@@ -365,10 +475,39 @@ export default function Inbox() {
         }
     };
 
+    const submitTaskAccept = async (values) => {
+        const item = acceptingItem;
+        setProcessingId(item.id);
+        const original = item.original_estimation || {};
+
+        const hasTimelineChanged =
+            (values.startDate && !dayjs(values.startDate).isSame(dayjs(original.task_start_date))) ||
+            values.effortAmount !== (original.effort_estimation || 0) ||
+            values.effortUnit !== (original.effort_estimation_unit || "minutes");
+
+        if (hasTimelineChanged) {
+            requestEffortChange({
+                task_id: item.task_id,
+                effort_estimation: values.effortAmount,
+                effort_estimation_unit: values.effortUnit,
+                reason: values.note,
+                updated_by: userId
+            });
+        } else {
+            acceptTask({
+                task_id: item.task_id,
+                updated_by: userId
+            });
+            setAcceptModalOpen(false);
+            setAcceptingItem(null);
+        }
+    };
+
     const submitTaskReject = () => {
         if (!rejectReason.trim()) {
-            return message.warning("Please provide a rejection reason");
+            return message.warning("Please provide a reason for rejection");
         }
+        setProcessingId(rejectingItem.id);
         rejectTask({
             task_id: rejectingItem.task_id,
             updated_by: userId,
@@ -432,11 +571,13 @@ export default function Inbox() {
                                     n={n}
                                     onInviteResolve={handleInviteResolve}
                                     onTaskResolve={handleTaskResolve}
-                                    acceptingInvite={acceptingInvite}
-                                    decliningInvite={decliningInvite}
-                                    acceptingTask={acceptingTask}
-                                    rejectingTask={rejectingTask}
-                                    resolvingTask={resolvingTask}
+                                    acceptingInvite={acceptingInvite && processingId === n.id}
+                                    decliningInvite={decliningInvite && processingId === n.id}
+                                    acceptingTask={acceptingTask && processingId === n.id}
+                                    rejectingTask={rejectingTask && processingId === n.id}
+                                    resolvingTask={resolvingTask && processingId === n.id}
+                                    approvingEffortChange={approvingEffortChange && processingId === n.id}
+                                    resubmittingEffortChange={resubmittingEffortChange && processingId === n.id}
                                 />
                             ))}
                         </div>
@@ -447,7 +588,10 @@ export default function Inbox() {
             <Modal
                 title={<span className="text-white">Reject Task</span>}
                 open={rejectModalOpen}
-                onCancel={() => setRejectModalOpen(false)}
+                onCancel={() => {
+                    setRejectModalOpen(false);
+                    setProcessingId(null);
+                }}
                 onOk={submitTaskReject}
                 confirmLoading={rejectingTask}
                 okText="Reject Task"
@@ -469,6 +613,18 @@ export default function Inbox() {
                     />
                 </div>
             </Modal>
+
+            <AcceptTaskModal
+                open={acceptModalOpen}
+                onCancel={() => {
+                    setAcceptModalOpen(false);
+                    setAcceptingItem(null);
+                    setProcessingId(null);
+                }}
+                onSubmit={submitTaskAccept}
+                task={acceptingItem}
+                loading={acceptingTask || requestingEffortChange}
+            />
 
             <style jsx>{`
         :global(.ant-spin-dot-item) {

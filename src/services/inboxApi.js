@@ -25,6 +25,15 @@ export const rejectTaskApi = async (data) =>
 export const resolveTaskApi = async (data) =>
     await axiosInstance.post(API_ENDPOINTS.TASK_RESOLVE, data);
 
+export const requestTaskEffortChangeApi = async (data) =>
+    await axiosInstance.post(API_ENDPOINTS.TASK_EFFORT_CHANGE_REQUEST, data);
+
+export const approveTaskEffortChangeApi = async (data) =>
+    await axiosInstance.post(API_ENDPOINTS.TASK_EFFORT_CHANGE_APPROVE, data);
+
+export const resubmitTaskEffortChangeApi = async (data) =>
+    await axiosInstance.post(API_ENDPOINTS.TASK_EFFORT_CHANGE_RESUBMIT, data);
+
 /**
  * Placeholder for accepting/declining invitations or tasks.
  * These might need specific endpoints depending on the backend implementation.

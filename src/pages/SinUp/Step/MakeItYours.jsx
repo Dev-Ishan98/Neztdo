@@ -15,7 +15,7 @@ const MakeItYours = () => {
   const { notifySuccess, notifyError } = useNotification();
   const [form] = Form.useForm();
 
-  const email = location.state?.email || "";
+  const email = location.state?.email;
 
   // Fetch countries list
   const { data: countriesData, isLoading: isLoadingCountries } = useQuery({

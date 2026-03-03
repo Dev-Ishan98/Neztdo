@@ -1,4 +1,3 @@
-import React from "react";
 import { Modal, Button } from "antd";
 
 export default function ConfirmModal({
@@ -44,8 +43,8 @@ export default function ConfirmModal({
                         onClick={onConfirm}
                         loading={loading}
                         className={`h-12 rounded-xl font-semibold text-white border-none ${isDanger
-                                ? "bg-[#ef4444] hover:bg-[#dc2626]"
-                                : "bg-[#3b82f6] hover:bg-[#2563eb]"
+                            ? "bg-[#ef4444] hover:bg-[#dc2626]"
+                            : "bg-[#3b82f6] hover:bg-[#2563eb]"
                             } transition-all duration-200`}
                     >
                         {confirmText}

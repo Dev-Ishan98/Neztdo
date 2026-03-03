@@ -29,3 +29,6 @@ export const removeMemberApi = async (data) =>
 
 export const assignMemberToProjectApi = async (data) =>
     await axiosInstance.post(API_ENDPOINTS.MEMBER_ASSIGN_TO_PROJECT, data);
+
+export const getMemberDetailsApi = async (params) =>
+    await axiosInstance.get(API_ENDPOINTS.MEMBER_DETAILS, { params });

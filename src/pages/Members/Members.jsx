@@ -6,6 +6,7 @@ import { useSelector } from "react-redux";
 import { getAllMembersByOwnerApi, cancelInvitationApi, removeMemberApi, removeInvitationApi } from "../../services/memberApi";
 import InviteMemberModal from "./InviteMemberModal";
 import MemberSettingsModal from "./MemberSettingsModal";
+import MemberDetailsDrawer from "./MemberDetailsDrawer";
 import ConfirmModal from "./ConfirmModal";
 import useNotification from "../../hooks/useNotification";
 import dayjs from "dayjs";
@@ -19,12 +20,13 @@ export default function Members() {
 
     const [inviteModalOpen, setInviteModalOpen] = useState(false);
     const [settingsModalOpen, setSettingsModalOpen] = useState(false);
+    const [detailsDrawerOpen, setDetailsDrawerOpen] = useState(false);
     const [confirmModalOpen, setConfirmModalOpen] = useState(false);
 
     const [selectedMember, setSelectedMember] = useState(null);
     const [confirmAction, setConfirmAction] = useState({ type: "", member: null });
 
-    // Debounce search
+    // search
     useEffect(() => {
         const timer = setTimeout(() => {
             setDebouncedSearch(search);
@@ -32,7 +34,7 @@ export default function Members() {
         return () => clearTimeout(timer);
     }, [search]);
 
-    // ─── Fetch Members ────────────────────────────────────────────────────────
+    // Fetch Members
     const {
         data: membersData,
         fetchNextPage,
@@ -66,7 +68,8 @@ export default function Members() {
         (page) => page?.data?.output?.members || []
     ) || [];
 
-    // ─── Infinite Scroll ──────────────────────────────────────────────────────
+
+    // Infinite Scroll
     const sentinelRef = useRef(null);
     const observerRef = useRef(null);
 
@@ -84,31 +87,34 @@ export default function Members() {
         return () => observerRef.current?.disconnect();
     }, [handleObserver, members]);
 
-    // ─── Mutations ────────────────────────────────────────────────────────────
+
+    // Cancel Invitaation
     const { mutate: cancelInvitation, isPending: isCancelling } = useMutation({
         mutationFn: cancelInvitationApi,
         onSuccess: (res) => {
-            notifySuccess(res?.data?.message || "Invitation cancelled");
+            notifySuccess(res?.data?.message);
             setConfirmModalOpen(false);
             refetch();
         },
         onError: (err) => notifyError(err?.response?.data?.message || "Failed to cancel invitation"),
     });
 
+    // Remove Invitation
     const { mutate: removeInvitation, isPending: isRemovingInvite } = useMutation({
         mutationFn: removeInvitationApi,
         onSuccess: (res) => {
-            notifySuccess(res?.data?.message || "Invitation removed");
+            notifySuccess(res?.data?.message);
             setConfirmModalOpen(false);
             refetch();
         },
         onError: (err) => notifyError(err?.response?.data?.message || "Failed to remove invitation"),
     });
 
+    // Remove Member
     const { mutate: removeMember, isPending: isRemoving } = useMutation({
         mutationFn: removeMemberApi,
         onSuccess: (res) => {
-            notifySuccess(res?.data?.message || "Member removed");
+            notifySuccess(res?.data?.message);
             setConfirmModalOpen(false);
             setSettingsModalOpen(false);
             refetch();
@@ -116,7 +122,7 @@ export default function Members() {
         onError: (err) => notifyError(err?.response?.data?.message || "Failed to remove member"),
     });
 
-    // ─── Handlers ─────────────────────────────────────────────────────────────
+    // model hendele functions
     const handleCancelClick = (member) => {
         setConfirmAction({ type: "cancel", member });
         setConfirmModalOpen(true);
@@ -156,7 +162,6 @@ export default function Members() {
 
     return (
         <div className="flex flex-col h-full min-h-screen bg-[#0a0e1a] p-6">
-            {/* Header Section */}
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
                 <div>
                     <h1 className="text-2xl font-bold text-[#f1f5f9] mb-1">Members</h1>
@@ -176,7 +181,6 @@ export default function Members() {
                 </button>
             </div>
 
-            {/* Search Bar */}
             <div className="mb-6">
                 <Input
                     prefix={<SearchOutlined className="text-[#475569] mr-2" />}
@@ -199,7 +203,13 @@ export default function Members() {
                         {members.map((member) => (
                             <div
                                 key={member.id}
-                                className="group bg-[#141824] border border-[#1e293b] rounded-[24px] p-6 hover:border-[#334155] transition-all duration-300 hover:shadow-2xl hover:shadow-blue-900/10"
+                                onClick={() => {
+                                    if (member.invite_status === 1) {
+                                        setSelectedMember(member);
+                                        setDetailsDrawerOpen(true);
+                                    }
+                                }}
+                                className={`group bg-[#141824] border border-[#1e293b] rounded-[24px] p-6 transition-all duration-300 hover:shadow-2xl hover:shadow-blue-900/10 ${member.invite_status === 1 ? "cursor-pointer hover:border-[#334155]" : "border-[#1e293b]"}`}
                             >
                                 <div className="flex items-start justify-between mb-4">
                                     <div className="flex items-center gap-3">
@@ -213,7 +223,7 @@ export default function Members() {
                                         </div>
                                         <div className="flex flex-col min-w-0">
                                             <span className="text-[#f1f5f9] font-semibold truncate">
-                                                {member.member_nickname || member.full_name || "Unknown"}
+                                                {member.member_nickname || member.member_full_name || "Unknown"}
                                             </span>
                                             <span className="text-[#64748b] text-[11px] truncate">
                                                 {member.member_email || member.member_unique_id}
@@ -223,7 +233,8 @@ export default function Members() {
 
                                     {member.invite_status !== 0 && member.invite_status !== 2 && (
                                         <button
-                                            onClick={() => {
+                                            onClick={(e) => {
+                                                e.stopPropagation();
                                                 setSelectedMember(member);
                                                 setSettingsModalOpen(true);
                                             }}
@@ -257,19 +268,15 @@ export default function Members() {
                                                     Pending
                                                 </span>
                                                 <button
-                                                    onClick={() => handleCancelClick(member)}
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        handleCancelClick(member);
+                                                    }}
                                                     className="w-6 h-6 rounded-lg flex items-center justify-center text-[#94a3b8] hover:text-[#ef4444] transition-all hover:bg-[#ef4444]/10"
                                                 >
                                                     <CloseOutlined style={{ fontSize: 12 }} />
                                                 </button>
                                             </div>
-                                        </div>
-                                    ) : member.invite_status === 1 ? (
-                                        <div className="flex items-center justify-between bg-[#064e3b]/10 border border-[#065f46]/20 rounded-2xl px-4 py-3 mt-2">
-                                            <span className="text-[11px] uppercase font-bold tracking-wider text-[#94a3b8]">Invite Status</span>
-                                            <span className="text-[11px] font-bold px-4 py-1.5 rounded-xl bg-[#10b981]/20 text-[#34d399]">
-                                                Accepted
-                                            </span>
                                         </div>
                                     ) : member.invite_status === 2 ? (
                                         <div className="flex flex-col gap-4 mt-2">
@@ -280,7 +287,10 @@ export default function Members() {
                                                 </span>
                                             </div>
                                             <button
-                                                onClick={() => handleRemoveInviteClick(member)}
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    handleRemoveInviteClick(member);
+                                                }}
                                                 className="w-full py-3 rounded-xl text-[13px] font-semibold text-[#f1f5f9] bg-[#1e2333] border border-[#2d3548] hover:bg-[#2d3548] transition-all duration-200"
                                             >
                                                 Remove from member list
@@ -298,14 +308,11 @@ export default function Members() {
                         className="py-20"
                     />
                 )}
-
-                {/* Sentinel for Infinite Scroll */}
                 <div ref={sentinelRef} className="h-10 flex items-center justify-center">
                     {isFetchingNextPage && <Spin size="small" />}
                 </div>
             </div>
 
-            {/* Modals */}
             <InviteMemberModal
                 open={inviteModalOpen}
                 onClose={() => setInviteModalOpen(false)}
@@ -318,6 +325,13 @@ export default function Members() {
                 member={selectedMember}
                 onSuccess={() => refetch()}
                 onDelete={handleDeleteClick}
+            />
+
+            <MemberDetailsDrawer
+                open={detailsDrawerOpen}
+                onClose={() => setDetailsDrawerOpen(false)}
+                memberId={selectedMember?.member_id}
+                ownerId={selectedMember?.member_owner_id}
             />
 
             <ConfirmModal

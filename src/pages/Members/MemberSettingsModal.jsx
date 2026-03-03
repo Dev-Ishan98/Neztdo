@@ -20,18 +20,18 @@ export default function MemberSettingsModal({ open, onClose, member, onSuccess, 
     const { mutate: changeNickname, isPending: isSaving } = useMutation({
         mutationFn: changeMemberNicknameApi,
         onSuccess: (response) => {
-            notifySuccess(response?.data?.message || "Nickname updated successfully");
+            notifySuccess(response?.data?.message);
             onClose();
             onSuccess?.();
         },
         onError: (error) => {
-            notifyError(error?.response?.data?.message || "Failed to update nickname");
+            notifyError(error?.response?.data?.message);
         },
     });
 
     const onFinish = (values) => {
         changeNickname({
-            membership_id: member.id, // Assuming 'id' is membership_id from the list
+            membership_id: member.id,
             member_nickname: values.nickname
         });
     };
@@ -84,7 +84,7 @@ export default function MemberSettingsModal({ open, onClose, member, onSuccess, 
                         />
                     </Form.Item>
 
-                    <div className="space-y-3">
+                    <div className="space-y-3 mt-5">
                         <Button
                             type="primary"
                             htmlType="submit"
@@ -93,6 +93,10 @@ export default function MemberSettingsModal({ open, onClose, member, onSuccess, 
                         >
                             Change Nickname
                         </Button>
+
+
+                    </div>
+                    <div className="space-y-3">
 
                         <Button
                             onClick={() => onDelete(member)}

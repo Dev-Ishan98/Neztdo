@@ -1,14 +1,17 @@
 import { useState, useMemo } from "react";
 import { DragDropContext, Droppable, Draggable } from "@hello-pangea/dnd";
-import { Plus, Paperclip, Flame, AlertCircle } from "lucide-react";
+import { Plus, Paperclip, Flame, AlertCircle, Clock } from "lucide-react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useSelector } from "react-redux";
 import { Modal, Input, message as antMessage } from "antd";
 import { getAllTasksApi, changeTaskStatusApi } from "../../services/taskApi";
+import { getProjectDetailApi } from "../../services/projectApi";
+import dayjs from "dayjs";
 import CreateTaskModal from "../Task/CreateTaskModal";
 import TaskTypeModal from "./TaskTypeModal";
 import AssignMemberModal from "./AssignMemberModal";
 import TaskDetailPanel from "./TaskDetailPanel";
+import ProjectDashboard from "./ProjectDashboard";
 import { Settings, UserPlus } from "lucide-react";
 
 // ─── Column config ─────────────────────────────────────────────────────────────
@@ -180,7 +183,7 @@ function ReasonModal({ open, srcLabel, dstLabel, onConfirm, onCancel, loading })
             cancelText="Cancel"
             confirmLoading={loading}
             okButtonProps={{
-                style: { background: "#6366f1", border: "none" },
+                style: { background: "#3b82f6", border: "none" },
             }}
             styles={{
                 content: { background: "#141824", borderRadius: 16 },
@@ -207,7 +210,7 @@ function ReasonModal({ open, srcLabel, dstLabel, onConfirm, onCancel, loading })
 
 // ─── Task Card ────────────────────────────────────────────────────────────────
 
-function TaskCard({ task, index, onTaskClick, isDragDisabled }) {
+function TaskCard({ task, index, onTaskClick, isDragDisabled, delayDays }) {
     const visibleSubtasks = (task.sub_tasks || []).slice(0, 3);
     const extraSubtasks = (task.sub_tasks || []).length - 3;
 
@@ -313,16 +316,32 @@ function TaskCard({ task, index, onTaskClick, isDragDisabled }) {
                     )}
 
                     {/* Footer */}
-                    <div className="flex items-center justify-end">
-                        <div className="flex items-center gap-1 text-[#A6A6A6] text-xs">
-                            <Paperclip size={11} />
-                            <span>{task.attachment_urls.length}</span>
+                    <div className="flex items-center justify-between mt-1">
+                        <div>
+                            {delayDays > 0 && (
+                                <span
+                                    className="inline-flex items-center gap-1 text-[11px] font-bold px-3 py-1 rounded-full text-white"
+                                    style={{
+                                        background: "linear-gradient(135deg, #ef4444, #dc2626)",
+                                        boxShadow: "0 2px 8px rgba(239,68,68,0.4)",
+                                    }}
+                                >
+                                    <Clock size={10} />
+                                    {delayDays} {delayDays === 1 ? "Day" : "Days"} Late
+                                </span>
+                            )}
                         </div>
-                        {task.task_priority === 1 && (
-                            <span className="text-[10px] font-semibold px-2 py-0.5 rounded-md bg-[rgba(239,68,68,0.15)] text-[#ef4444] border border-[rgba(239,68,68,0.25)]">
-                                High
-                            </span>
-                        )}
+                        <div className="flex items-center gap-2">
+                            <div className="flex items-center gap-1 text-[#A6A6A6] text-xs">
+                                <Paperclip size={11} />
+                                <span>{task.attachment_urls.length}</span>
+                            </div>
+                            {task.task_priority === 1 && (
+                                <span className="text-[10px] font-semibold px-2 py-0.5 rounded-md bg-[rgba(239,68,68,0.15)] text-[#ef4444] border border-[rgba(239,68,68,0.25)]">
+                                    High
+                                </span>
+                            )}
+                        </div>
                     </div>
                 </div>
             )}
@@ -332,7 +351,7 @@ function TaskCard({ task, index, onTaskClick, isDragDisabled }) {
 
 // ─── Kanban Column ────────────────────────────────────────────────────────────
 
-function KanbanColumn({ column, tasks, onAddTask, onTaskClick, permKey, loginId }) {
+function KanbanColumn({ column, tasks, onAddTask, onTaskClick, permKey, loginId, delayedTaskMap }) {
     return (
         <div
             className="flex flex-col min-w-[280px] w-[280px] rounded-[18px] p-3 "
@@ -385,6 +404,7 @@ function KanbanColumn({ column, tasks, onAddTask, onTaskClick, permKey, loginId 
                                     index={index}
                                     onTaskClick={onTaskClick}
                                     isDragDisabled={!someAllowed}
+                                    delayDays={delayedTaskMap?.[task.id] ?? 0}
                                 />
                             );
                         })}
@@ -426,6 +446,7 @@ function KanbanSkeleton() {
 // ─── Project Board ────────────────────────────────────────────────────────────
 
 export default function ProjectBoard({ project }) {
+    console.log(project);
     const [taskModalOpen, setTaskModalOpen] = useState(false);
     const [taskTypeModalOpen, setTaskTypeModalOpen] = useState(false);
     const [assignMemberModalOpen, setAssignMemberModalOpen] = useState(false);
@@ -451,13 +472,45 @@ export default function ProjectBoard({ project }) {
     const projectName = project?.project_name || "Project";
     const projectColor = project?.project_color_code || "#3b82f6";
 
-    // ── Fetch Tasks ────────────────────────────────────────────────────────────
+    // ── Fetch Project Details (for delayed tasks) ──────────────────────────────
+    const { data: projectDetailRes } = useQuery({
+        queryKey: ["projectDetail", { project_id: projectId, viewer_id: loginId }],
+        queryFn: () => getProjectDetailApi({ project_id: projectId, viewer_id: loginId }),
+        enabled: !!projectId && !!loginId,
+        staleTime: 1000 * 60,
+    });
+
+    // Build a map: taskId -> days late (from project_delayed_tasks)
+    const delayedTaskMap = useMemo(() => {
+        const delayed = projectDetailRes?.data?.data?.project_overview?.project_delayed_tasks || [];
+        const today = dayjs().startOf("day");
+        const map = {};
+        delayed.forEach((t) => {
+            const dueDate = dayjs(t.task_due_date).startOf("day");
+            const diff = today.diff(dueDate, "day");
+            if (diff > 0) map[t.id] = diff;
+        });
+        return map;
+    }, [projectDetailRes]);
+
     // Stable query key — shared between useQuery and cache patches
     const tasksQueryKey = [
         "tasks",
         {
             project_id: projectId,
             project_owner_id: projectOwnerId,
+            page: 1,
+            per_page: 50,
+            order_by: "created_at",
+            sort: "desc",
+        },
+    ];
+
+    const myTasksQueryKey = [
+        "myTasks",
+        {
+            project_id: projectId,
+            assignee_id: loginId,
             page: 1,
             per_page: 50,
             order_by: "created_at",
@@ -478,14 +531,28 @@ export default function ProjectBoard({ project }) {
         staleTime: 1000 * 30,
     });
 
-    const rawTasks = tasksResponse?.data?.output?.tasks || [];
+    const {
+        data: myTasksResponse,
+        isLoading: isMyTasksLoading,
+        isError: isMyTasksError,
+        error: myTasksError,
+        refetch: refetchMyTasks,
+    } = useQuery({
+        queryKey: myTasksQueryKey,
+        queryFn: getAllTasksApi,
+        enabled: !!projectId && !!loginId && activeTab === "my tasks",
+        staleTime: 1000 * 30,
+    });
 
-    // columned from API
+    const rawTasks = tasksResponse?.data?.output?.tasks || [];
+    const rawMyTasks = myTasksResponse?.data?.output?.tasks || [];
+
+    // columned from API — All Tasks
     const apiColumns = useMemo(() => {
         const cols = {};
         Object.keys(COLUMN_CONFIG).forEach((k) => (cols[k] = []));
         rawTasks
-            .filter((task) => task.task_status !== 0) // hide Pending (status 0) from board
+            .filter((task) => task.task_status !== 0)
             .forEach((task) => {
                 const col = mapStatusToColumn(task.task_status);
                 cols[col].push(task);
@@ -493,17 +560,40 @@ export default function ProjectBoard({ project }) {
         return cols;
     }, [rawTasks]);
 
+    // columned from API — My Tasks
+    const apiMyColumns = useMemo(() => {
+        const cols = {};
+        Object.keys(COLUMN_CONFIG).forEach((k) => (cols[k] = []));
+        rawMyTasks
+            .filter((task) => task.task_status !== 0)
+            .forEach((task) => {
+                const col = mapStatusToColumn(task.task_status);
+                cols[col].push(task);
+            });
+        return cols;
+    }, [rawMyTasks]);
+
     const [localColumns, setLocalColumns] = useState(null);
-    const columns = localColumns || apiColumns;
+    const [localMyColumns, setLocalMyColumns] = useState(null);
+
+    // Active columns depend on tab
+    const isMyTasksTab = activeTab === "my tasks";
+    const columns = isMyTasksTab
+        ? (localMyColumns || apiMyColumns)
+        : (localColumns || apiColumns);
+
+    const activeQueryKey = isMyTasksTab ? myTasksQueryKey : tasksQueryKey;
+    const activeRefetch = isMyTasksTab ? refetchMyTasks : refetchTasks;
+    const isActiveLoading = isMyTasksTab ? isMyTasksLoading : isTasksLoading;
+    const isActiveError = isMyTasksTab ? isMyTasksError : isTasksError;
+    const activeError = isMyTasksTab ? myTasksError : tasksError;
 
     // ── Status Change Mutation ─────────────────────────────────────────────────
     const { mutate: changeStatus, isPending: isChangingStatus } = useMutation({
         mutationFn: changeTaskStatusApi,
         onSuccess: (_data, variables) => {
-            // 1. Patch the query cache directly so apiColumns already has the
-            //    new status before we clear localColumns. This prevents the
-            //    jump-back flash caused by stale apiColumns.
-            queryClient.setQueryData(tasksQueryKey, (old) => {
+            // Patch the active query cache
+            queryClient.setQueryData(activeQueryKey, (old) => {
                 if (!old) return old;
                 const tasks = old?.data?.output?.tasks ?? [];
                 const patched = tasks.map((t) =>
@@ -519,13 +609,17 @@ export default function ProjectBoard({ project }) {
                     },
                 };
             });
-            // 2. Now safe to drop local state — apiColumns already correct.
-            setLocalColumns(null);
-            // 3. Background refetch to stay in sync (won't cause a bounce).
-            refetchTasks();
+            if (isMyTasksTab) {
+                setLocalMyColumns(null);
+                refetchMyTasks();
+            } else {
+                setLocalColumns(null);
+                refetchTasks();
+            }
         },
         onError: (err, _vars, context) => {
-            setLocalColumns(context?.snapshot ?? null);
+            if (isMyTasksTab) setLocalMyColumns(context?.snapshot ?? null);
+            else setLocalColumns(context?.snapshot ?? null);
             antMessage.error(
                 err?.response?.data?.message || "Failed to update task status. Please try again."
             );
@@ -554,30 +648,26 @@ export default function ProjectBoard({ project }) {
         const dstCol = destination.droppableId;
 
         if (srcCol === dstCol && source.index === destination.index) return;
-        if (srcCol === dstCol) return; // same col reorder: ignore for now
+        if (srcCol === dstCol) return;
 
-        // Find the task being moved
-        const base = localColumns || apiColumns;
+        const base = isMyTasksTab ? (localMyColumns || apiMyColumns) : (localColumns || apiColumns);
         const movedTask = base[srcCol]?.[source.index];
         if (!movedTask) return;
 
-        // Permission check
         const { allowed, needsReason } = canMove(movedTask, srcCol, dstCol, permKey, loginId);
-        if (!allowed) return; // silently snap back
+        if (!allowed) return;
 
-        // Snapshot before optimistic update
         const snapshot = JSON.parse(JSON.stringify(base));
 
-        // Optimistic update immediately
         const { newCols, moved } = applyOptimisticMove(
             base, srcCol, dstCol, source.index, destination.index
         );
-        setLocalColumns(newCols);
+        if (isMyTasksTab) setLocalMyColumns(newCols);
+        else setLocalColumns(newCols);
 
         const newStatus = COLUMN_CONFIG[dstCol].apiStatus;
 
         if (needsReason) {
-            // Open reason modal; API call will happen after the user provides a reason
             setReasonModal({
                 open: true,
                 srcCol,
@@ -586,7 +676,6 @@ export default function ProjectBoard({ project }) {
                 snapshotCols: snapshot,
             });
         } else {
-            // Fire API immediately
             changeStatus(
                 {
                     task_id: moved.id,
@@ -615,12 +704,13 @@ export default function ProjectBoard({ project }) {
     };
 
     const handleReasonCancel = () => {
-        // Roll back the optimistic update
-        setLocalColumns(reasonModal.snapshotCols);
+        const snap = reasonModal.snapshotCols;
+        if (isMyTasksTab) setLocalMyColumns(snap);
+        else setLocalColumns(snap);
         setReasonModal({ open: false, srcCol: null, dstCol: null, movedTask: null, snapshotCols: null });
     };
 
-    const tabs = ["Dashboard", "Tasks", "Timeline", "Files"];
+    const tabs = ["Dashboard", "All Tasks", "My Tasks", "Timeline"];
 
     return (
         <div className="flex flex-col h-full min-h-screen bg-[#0a0e1a]">
@@ -718,45 +808,55 @@ export default function ProjectBoard({ project }) {
                 })}
             </div>
 
+            {/* ── Dashboard ──────────────────────────────────────────────────── */}
+            {activeTab === "dashboard" && (
+                <div className="flex-1 overflow-auto p-6">
+                    <ProjectDashboard project={project} />
+                </div>
+            )}
+
             {/* ── Kanban Board ──────────────────────────────────────────────── */}
-            <div className="flex-1 overflow-auto p-6">
-                {isTasksLoading && <KanbanSkeleton />}
+            {activeTab !== "dashboard" && (
+                <div className="flex-1 overflow-auto p-6">
+                    {isActiveLoading && <KanbanSkeleton />}
 
-                {isTasksError && (
-                    <div className="flex flex-col items-center justify-center py-20 gap-4">
-                        <AlertCircle className="text-[#ef4444]" size={40} />
-                        <p className="text-[#ef4444] text-sm font-semibold">Failed to load tasks</p>
-                        <p className="text-[#475569] text-xs">
-                            {tasksError?.response?.data?.message || "Something went wrong."}
-                        </p>
-                        <button
-                            onClick={() => refetchTasks()}
-                            className="px-4 py-2 text-sm font-semibold text-white rounded-xl"
-                            style={{ background: "linear-gradient(135deg, #3b82f6, #06b6d4)" }}
-                        >
-                            Retry
-                        </button>
-                    </div>
-                )}
-
-                {!isTasksLoading && !isTasksError && (
-                    <DragDropContext onDragEnd={onDragEnd}>
-                        <div className="flex gap-5 min-w-max">
-                            {Object.values(COLUMN_CONFIG).map((column) => (
-                                <KanbanColumn
-                                    key={column.id}
-                                    column={column}
-                                    tasks={columns[column.id] || []}
-                                    onAddTask={() => setTaskModalOpen(true)}
-                                    onTaskClick={(id) => setSelectedTaskId(id)}
-                                    permKey={permKey}
-                                    loginId={loginId}
-                                />
-                            ))}
+                    {isActiveError && (
+                        <div className="flex flex-col items-center justify-center py-20 gap-4">
+                            <AlertCircle className="text-[#ef4444]" size={40} />
+                            <p className="text-[#ef4444] text-sm font-semibold">Failed to load tasks</p>
+                            <p className="text-[#475569] text-xs">
+                                {activeError?.response?.data?.message || "Something went wrong."}
+                            </p>
+                            <button
+                                onClick={() => activeRefetch()}
+                                className="px-4 py-2 text-sm font-semibold text-white rounded-xl"
+                                style={{ background: "linear-gradient(135deg, #3b82f6, #06b6d4)" }}
+                            >
+                                Retry
+                            </button>
                         </div>
-                    </DragDropContext>
-                )}
-            </div>
+                    )}
+
+                    {!isActiveLoading && !isActiveError && (
+                        <DragDropContext onDragEnd={onDragEnd}>
+                            <div className="flex gap-5 min-w-max">
+                                {Object.values(COLUMN_CONFIG).map((column) => (
+                                    <KanbanColumn
+                                        key={column.id}
+                                        column={column}
+                                        tasks={columns[column.id] || []}
+                                        onAddTask={() => setTaskModalOpen(true)}
+                                        onTaskClick={(id) => setSelectedTaskId(id)}
+                                        permKey={permKey}
+                                        loginId={loginId}
+                                        delayedTaskMap={delayedTaskMap}
+                                    />
+                                ))}
+                            </div>
+                        </DragDropContext>
+                    )}
+                </div>
+            )}
 
             {/* ── Reason Modal ───────────────────────────────────────────────── */}
             <ReasonModal

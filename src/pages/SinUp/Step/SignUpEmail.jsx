@@ -1,5 +1,3 @@
-// src/components/auth/WelcomeBack.jsx
-import React, { useState } from "react";
 import { Button, Input, Form, Typography } from "antd";
 import { MailOutlined } from "@ant-design/icons";
 import { useMutation } from "@tanstack/react-query";
@@ -10,6 +8,7 @@ import useNotification from "../../../hooks/useNotification";
 const { Title, Text, Paragraph } = Typography;
 
 const SignUpEmail = () => {
+
   const navigate = useNavigate();
   const { notifySuccess, notifyError, notifyInfo } = useNotification();
   const [form] = Form.useForm();
@@ -17,16 +16,12 @@ const SignUpEmail = () => {
   // Check if user exists mutation
   const { mutate: checkUserExists, isPending: isCheckingUser } = useMutation({
     mutationFn: checkUserExistsApi,
-    onSuccess: (response) => {
-      // User exists, navigate to sign-in
-      //notifyInfo(response?.data?.message);
+    onSuccess: () => {
       const email = form.getFieldValue("email");
       navigate("/sign-in", { state: { email } });
     },
     onError: (error) => {
-      // User doesn't exist, proceed with OTP request
       if (error?.response?.data?.success === false) {
-        // This means user doesn't exist, which is expected for signup
         requestOtp({ email: form.getFieldValue("email") });
       } else {
         notifyError(error?.response?.data?.message);
@@ -53,7 +48,6 @@ const SignUpEmail = () => {
   });
 
   const handleSubmit = (values) => {
-    // First check if user exists
     checkUserExists(values);
   };
 
